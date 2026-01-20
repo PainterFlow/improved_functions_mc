@@ -10,6 +10,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.network.chat.Component;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -18,30 +19,28 @@ public class FuncCommandMod implements ModInitializer {
     @Override
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+
             dispatcher.register(
                 Commands.literal("dfunc")
+
+                    // Example subcommand (proves extensibility)
                     .then(
-                        // 🔑 IMPORTANT FIX: string(), NOT word()
-                        Commands.argument("function", StringArgumentType.string())
+                        Commands.literal("reload")
+                            .executes(ctx -> {
+                                ctx.getSource().sendSuccess(
+                                    () -> Component.literal("Reload not implemented yet"),
+                                    false
+                                );
+                                return 1;
+                            })
+                    )
+
+                    // MAIN COMMAND: /dfunc <namespace:path> [nbt...]
+                    .then(
+                        Commands.argument("input", StringArgumentType.greedyString())
                             .suggests(FuncCommandMod::suggestFunctions)
-                            // /dfunc <namespace:path>
                             .executes(ctx ->
-                                execute(
-                                    ctx,
-                                    StringArgumentType.getString(ctx, "function"),
-                                    null
-                                )
-                            )
-                            .then(
-                                // /dfunc <namespace:path> <nbt>
-                                Commands.argument("nbt", StringArgumentType.greedyString())
-                                    .executes(ctx ->
-                                        execute(
-                                            ctx,
-                                            StringArgumentType.getString(ctx, "function"),
-                                            StringArgumentType.getString(ctx, "nbt")
-                                        )
-                                    )
+                                execute(ctx, StringArgumentType.getString(ctx, "input"))
                             )
                     )
             );
@@ -49,26 +48,35 @@ public class FuncCommandMod implements ModInitializer {
     }
 
     // --------------------------------------------------
-    // EXECUTION (PLAYER CONTEXT, VANILLA BEHAVIOR)
+    // EXECUTION (ROBUST, NO BRIGADIER EDGE CASES)
     // --------------------------------------------------
     private static int execute(
         CommandContext<CommandSourceStack> ctx,
-        String functionId,
-        String nbt
+        String input
     ) {
         CommandSourceStack source = ctx.getSource();
 
+        // Split "<function> [nbt...]"
+        String functionPart;
+        String nbtPart = null;
+
+        int space = input.indexOf(' ');
+        if (space == -1) {
+            functionPart = input;
+        } else {
+            functionPart = input.substring(0, space);
+            nbtPart = input.substring(space + 1);
+        }
+
         ResourceLocation parsed;
         try {
-            parsed = ResourceLocation.parse(functionId);
+            parsed = ResourceLocation.parse(functionPart);
         } catch (Exception e) {
-            source.sendFailure(
-                net.minecraft.network.chat.Component.literal("Invalid function ID")
-            );
+            source.sendFailure(Component.literal("Invalid function ID"));
             return 0;
         }
 
-        // Redirect to data/<namespace>/functions/func/<path>.mcfunction
+        // data/<namespace>/functions/func/<path>.mcfunction
         ResourceLocation realFunction =
             ResourceLocation.fromNamespaceAndPath(
                 parsed.getNamespace(),
@@ -76,11 +84,10 @@ public class FuncCommandMod implements ModInitializer {
             );
 
         String command = "function " + realFunction;
-        if (nbt != null && !nbt.isBlank()) {
-            command += " " + nbt;
+        if (nbtPart != null && !nbtPart.isBlank()) {
+            command += " " + nbtPart;
         }
 
-        // Execute with full player context
         source.getServer()
             .getCommands()
             .performPrefixedCommand(source, command);
@@ -89,7 +96,7 @@ public class FuncCommandMod implements ModInitializer {
     }
 
     // --------------------------------------------------
-    // AUTOCOMPLETION (CLIENT-SAFE)
+    // AUTOCOMPLETION (SAFE + NON-DESTRUCTIVE)
     // --------------------------------------------------
     private static CompletableFuture<Suggestions> suggestFunctions(
         CommandContext<CommandSourceStack> ctx,
