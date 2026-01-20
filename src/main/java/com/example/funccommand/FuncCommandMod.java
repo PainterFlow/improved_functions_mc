@@ -8,8 +8,6 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.commands.arguments.ResourceLocationArgument;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 
@@ -23,22 +21,24 @@ public class FuncCommandMod implements ModInitializer {
             dispatcher.register(
                 Commands.literal("dfunc")
                     .then(
-                        Commands.argument("function", ResourceLocationArgument.id())
+                        Commands.argument("function", StringArgumentType.word())
                             .suggests(FuncCommandMod::suggestFunctions)
+                            // /dfunc <function>
                             .executes(ctx ->
                                 execute(
                                     ctx,
-                                    ResourceLocationArgument.getId(ctx, "function"),
+                                    StringArgumentType.getString(ctx, "function"),
                                     null
                                 )
                             )
                             .then(
+                                // /dfunc <function> <nbt>
                                 Commands.argument("nbt", StringArgumentType.greedyString())
                                     .executes(ctx ->
                                         execute(
                                             ctx,
-                                            ResourceLocationArgument.getId(ctx, "function"),
-                                            ctx.getArgument("nbt", String.class)
+                                            StringArgumentType.getString(ctx, "function"),
+                                            StringArgumentType.getString(ctx, "nbt")
                                         )
                                     )
                             )
@@ -48,28 +48,38 @@ public class FuncCommandMod implements ModInitializer {
     }
 
     // --------------------------------------------------
-    // EXECUTION (PLAYER CONTEXT + VANILLA RESPONSES)
+    // EXECUTION (PLAYER CONTEXT, VANILLA BEHAVIOR)
     // --------------------------------------------------
     private static int execute(
         CommandContext<CommandSourceStack> ctx,
-        ResourceLocation inputFunction,
+        String functionId,
         String nbt
     ) {
         CommandSourceStack source = ctx.getSource();
 
-        String namespace = inputFunction.getNamespace();
-        String path = inputFunction.getPath();
+        ResourceLocation parsed;
+        try {
+            parsed = ResourceLocation.parse(functionId);
+        } catch (Exception e) {
+            source.sendFailure(
+                net.minecraft.network.chat.Component.literal("Invalid function ID")
+            );
+            return 0;
+        }
 
-        // data/<namespace>/functions/func/<path>.mcfunction
+        // Redirect to data/<namespace>/functions/func/<path>.mcfunction
         ResourceLocation realFunction =
-            ResourceLocation.fromNamespaceAndPath(namespace, "func/" + path);
+            ResourceLocation.fromNamespaceAndPath(
+                parsed.getNamespace(),
+                "func/" + parsed.getPath()
+            );
 
         String command = "function " + realFunction;
         if (nbt != null && !nbt.isBlank()) {
             command += " " + nbt;
         }
 
-        // Execute with full player context (vanilla behavior)
+        // Execute with full player context
         source.getServer()
             .getCommands()
             .performPrefixedCommand(source, command);
@@ -78,25 +88,24 @@ public class FuncCommandMod implements ModInitializer {
     }
 
     // --------------------------------------------------
-    // AUTOCOMPLETION
+    // AUTOCOMPLETION (CLIENT-SAFE)
     // --------------------------------------------------
     private static CompletableFuture<Suggestions> suggestFunctions(
         CommandContext<CommandSourceStack> ctx,
         SuggestionsBuilder builder
     ) {
         MinecraftServer server = ctx.getSource().getServer();
+        if (server == null) {
+            return builder.buildFuture();
+        }
 
         for (var id : server.getFunctions().getFunctionNames()) {
-            // Only functions inside data/*/functions/func/
             if (!id.getPath().startsWith("func/")) continue;
 
-            ResourceLocation suggestionId =
-                ResourceLocation.fromNamespaceAndPath(
-                    id.getNamespace(),
-                    id.getPath().substring("func/".length())
-                );
-
-            builder.suggest(suggestionId.toString());
+            builder.suggest(
+                id.getNamespace() + ":" +
+                id.getPath().substring("func/".length())
+            );
         }
 
         return builder.buildFuture();
