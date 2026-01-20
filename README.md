@@ -13,4 +13,5 @@ mypack/
 This is very usefull for dialogs :)
 ### Known issues:
 - functions don't give any error responses, I recommend first testing with /function and then just replacing the "function" command with "dfunc"
+- while selectors like @s work, using ~ ~ ~ doesn't work yet, altho ill fix that
 - if you have any really bad issues dm me on discord: @painterflow11
