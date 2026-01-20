@@ -1,17 +1,18 @@
 package com.example.funccommand;
 
+import java.util.concurrent.CompletableFuture;
+
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-
-import java.util.concurrent.CompletableFuture;
 
 public class FuncCommandMod implements ModInitializer {
 
@@ -24,16 +25,20 @@ public class FuncCommandMod implements ModInitializer {
                         Commands.argument("function", StringArgumentType.string())
                             .suggests(FuncCommandMod::suggestFunctions)
                             .executes(ctx ->
-                                execute(ctx,
+                                execute(
+                                    ctx,
                                     StringArgumentType.getString(ctx, "function"),
-                                    null)
+                                    null
+                                )
                             )
                             .then(
                                 Commands.argument("nbt", StringArgumentType.greedyString())
                                     .executes(ctx ->
-                                        execute(ctx,
+                                        execute(
+                                            ctx,
                                             StringArgumentType.getString(ctx, "function"),
-                                            StringArgumentType.getString(ctx, "nbt"))
+                                            StringArgumentType.getString(ctx, "nbt")
+                                        )
                                     )
                             )
                     )
@@ -42,7 +47,7 @@ public class FuncCommandMod implements ModInitializer {
     }
 
     // --------------------------------------------------
-    // EXECUTION (PLAYER CONTEXT PRESERVED)
+    // EXECUTION (PLAYER CONTEXT + VANILLA RESPONSES)
     // --------------------------------------------------
     private static int execute(
         CommandContext<CommandSourceStack> ctx,
@@ -53,7 +58,7 @@ public class FuncCommandMod implements ModInitializer {
 
         int colon = inputFunction.indexOf(':');
         if (colon == -1) {
-            // Vanilla-style failure
+            // Vanilla-style error
             source.sendFailure(Component.translatable("commands.function.invalid"));
             return 0;
         }
@@ -61,7 +66,7 @@ public class FuncCommandMod implements ModInitializer {
         String namespace = inputFunction.substring(0, colon);
         String path = inputFunction.substring(colon + 1);
 
-        // Redirect to data/<namespace>/functions/func/<path>.mcfunction
+        // Map to data/<namespace>/functions/func/<path>.mcfunction
         String realFunction = namespace + ":func/" + path;
 
         String command = "function " + realFunction;
@@ -69,12 +74,14 @@ public class FuncCommandMod implements ModInitializer {
             command += " " + nbt;
         }
 
-        // 🔑 KEY LINE:
-        // Use the SAME CommandSourceStack the player has
-        // so vanilla handles execution + feedback
-        return source.getServer()
+        // Execute using the SAME CommandSourceStack
+        // -> preserves player context and vanilla feedback
+        source.getServer()
             .getCommands()
             .performPrefixedCommand(source, command);
+
+        // Brigadier success
+        return 1;
     }
 
     // --------------------------------------------------
@@ -87,7 +94,7 @@ public class FuncCommandMod implements ModInitializer {
         MinecraftServer server = ctx.getSource().getServer();
 
         for (var id : server.getFunctions().getFunctionNames()) {
-            // Only suggest functions inside data/*/functions/func/
+            // Only suggest functions in data/*/functions/func/
             if (!id.getPath().startsWith("func/")) continue;
 
             String suggestion =
