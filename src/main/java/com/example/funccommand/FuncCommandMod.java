@@ -1,18 +1,19 @@
 package com.example.funccommand;
 
-import java.util.concurrent.CompletableFuture;
-
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+
+import java.util.concurrent.CompletableFuture;
 
 public class FuncCommandMod implements ModInitializer {
 
@@ -22,12 +23,12 @@ public class FuncCommandMod implements ModInitializer {
             dispatcher.register(
                 Commands.literal("func")
                     .then(
-                        Commands.argument("function", StringArgumentType.string())
+                        Commands.argument("function", ResourceLocationArgument.id())
                             .suggests(FuncCommandMod::suggestFunctions)
                             .executes(ctx ->
                                 execute(
                                     ctx,
-                                    StringArgumentType.getString(ctx, "function"),
+                                    ResourceLocationArgument.getId(ctx, "function"),
                                     null
                                 )
                             )
@@ -36,8 +37,8 @@ public class FuncCommandMod implements ModInitializer {
                                     .executes(ctx ->
                                         execute(
                                             ctx,
-                                            StringArgumentType.getString(ctx, "function"),
-                                            StringArgumentType.getString(ctx, "nbt")
+                                            ResourceLocationArgument.getId(ctx, "function"),
+                                            ctx.getArgument("nbt", String.class)
                                         )
                                     )
                             )
@@ -51,36 +52,28 @@ public class FuncCommandMod implements ModInitializer {
     // --------------------------------------------------
     private static int execute(
         CommandContext<CommandSourceStack> ctx,
-        String inputFunction,
+        ResourceLocation inputFunction,
         String nbt
     ) {
         CommandSourceStack source = ctx.getSource();
 
-        int colon = inputFunction.indexOf(':');
-        if (colon == -1) {
-            // Vanilla-style error
-            source.sendFailure(Component.translatable("commands.function.invalid"));
-            return 0;
-        }
+        String namespace = inputFunction.getNamespace();
+        String path = inputFunction.getPath();
 
-        String namespace = inputFunction.substring(0, colon);
-        String path = inputFunction.substring(colon + 1);
-
-        // Map to data/<namespace>/functions/func/<path>.mcfunction
-        String realFunction = namespace + ":func/" + path;
+        // data/<namespace>/functions/func/<path>.mcfunction
+        ResourceLocation realFunction =
+            ResourceLocation.fromNamespaceAndPath(namespace, "func/" + path);
 
         String command = "function " + realFunction;
         if (nbt != null && !nbt.isBlank()) {
             command += " " + nbt;
         }
 
-        // Execute using the SAME CommandSourceStack
-        // -> preserves player context and vanilla feedback
+        // Execute with full player context (vanilla behavior)
         source.getServer()
             .getCommands()
             .performPrefixedCommand(source, command);
 
-        // Brigadier success
         return 1;
     }
 
@@ -94,14 +87,16 @@ public class FuncCommandMod implements ModInitializer {
         MinecraftServer server = ctx.getSource().getServer();
 
         for (var id : server.getFunctions().getFunctionNames()) {
-            // Only suggest functions in data/*/functions/func/
+            // Only functions inside data/*/functions/func/
             if (!id.getPath().startsWith("func/")) continue;
 
-            String suggestion =
-                id.getNamespace() + ":" +
-                id.getPath().substring("func/".length());
+            ResourceLocation suggestionId =
+                ResourceLocation.fromNamespaceAndPath(
+                    id.getNamespace(),
+                    id.getPath().substring("func/".length())
+                );
 
-            builder.suggest(suggestion);
+            builder.suggest(suggestionId.toString());
         }
 
         return builder.buildFuture();
