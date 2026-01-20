@@ -19,23 +19,8 @@ public class FuncCommandMod implements ModInitializer {
     @Override
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-
             dispatcher.register(
                 Commands.literal("dfunc")
-
-                    // Example subcommand (proves extensibility)
-                    .then(
-                        Commands.literal("reload")
-                            .executes(ctx -> {
-                                ctx.getSource().sendSuccess(
-                                    () -> Component.literal("Reload not implemented yet"),
-                                    false
-                                );
-                                return 1;
-                            })
-                    )
-
-                    // MAIN COMMAND: /dfunc <namespace:path> [nbt...]
                     .then(
                         Commands.argument("input", StringArgumentType.greedyString())
                             .suggests(FuncCommandMod::suggestFunctions)
@@ -48,7 +33,7 @@ public class FuncCommandMod implements ModInitializer {
     }
 
     // --------------------------------------------------
-    // EXECUTION (ROBUST, NO BRIGADIER EDGE CASES)
+    // EXECUTION (NO OP REQUIRED)
     // --------------------------------------------------
     private static int execute(
         CommandContext<CommandSourceStack> ctx,
@@ -88,15 +73,19 @@ public class FuncCommandMod implements ModInitializer {
             command += " " + nbtPart;
         }
 
-        source.getServer()
+        // 🔑 CRITICAL FIX:
+        // Run as the SAME player, but with elevated permissions
+        CommandSourceStack elevated = source.withPermission(4);
+
+        elevated.getServer()
             .getCommands()
-            .performPrefixedCommand(source, command);
+            .performPrefixedCommand(elevated, command);
 
         return 1;
     }
 
     // --------------------------------------------------
-    // AUTOCOMPLETION (SAFE + NON-DESTRUCTIVE)
+    // AUTOCOMPLETION (CLIENT-SAFE)
     // --------------------------------------------------
     private static CompletableFuture<Suggestions> suggestFunctions(
         CommandContext<CommandSourceStack> ctx,
