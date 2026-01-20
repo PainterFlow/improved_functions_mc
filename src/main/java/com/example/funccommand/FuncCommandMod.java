@@ -3,11 +3,10 @@ package com.example.funccommand;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.nbt.StringNbtReader;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
 
 public class FuncCommandMod implements ModInitializer {
 
@@ -15,17 +14,16 @@ public class FuncCommandMod implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(
-                CommandManager.literal("func")
-                    .requires(source -> true)
+                Commands.literal("func")
                     .then(
-                        CommandManager.argument("function", StringArgumentType.string())
+                        Commands.argument("function", StringArgumentType.string())
                             .executes(ctx -> execute(
                                 ctx.getSource(),
                                 StringArgumentType.getString(ctx, "function"),
                                 null
                             ))
                             .then(
-                                CommandManager.argument("nbt", StringArgumentType.greedyString())
+                                Commands.argument("nbt", StringArgumentType.greedyString())
                                     .executes(ctx -> execute(
                                         ctx.getSource(),
                                         StringArgumentType.getString(ctx, "function"),
@@ -37,36 +35,28 @@ public class FuncCommandMod implements ModInitializer {
         });
     }
 
-    private static int execute(ServerCommandSource source, String inputFunction, String nbt) {
+    private static int execute(CommandSourceStack source, String inputFunction, String nbt) {
         int colon = inputFunction.indexOf(':');
         if (colon == -1) {
-            source.sendError(Text.literal("Invalid function ID. Use namespace:path"));
+            source.sendFailure(Component.literal("Invalid function ID. Use namespace:path"));
             return 0;
         }
 
         String namespace = inputFunction.substring(0, colon);
         String path = inputFunction.substring(colon + 1);
 
+        // Map to data/<namespace>/functions/func/<path>.mcfunction
         String realFunction = namespace + ":func/" + path;
 
-        if (nbt != null) {
-            try {
-                StringNbtReader.parse(nbt);
-            } catch (Exception e) {
-                source.sendError(Text.literal("Invalid NBT."));
-                return 0;
-            }
-        }
-
         MinecraftServer server = source.getServer();
-        ServerCommandSource serverSource = server.getCommandSource();
+        CommandSourceStack serverSource = server.createCommandSourceStack();
 
         String command = "function " + realFunction;
         if (nbt != null) {
             command += " " + nbt;
         }
 
-        server.getCommandManager().executeWithPrefix(serverSource, command);
+        server.getCommands().performPrefixedCommand(serverSource, command);
         return 1;
     }
 }
