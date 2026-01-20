@@ -21,7 +21,7 @@ public class FuncCommandMod implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(
-                Commands.literal("func")
+                Commands.literal("dfunc")
                     .then(
                         Commands.argument("function", ResourceLocationArgument.id())
                             .suggests(FuncCommandMod::suggestFunctions)
