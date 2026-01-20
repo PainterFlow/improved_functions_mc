@@ -8,9 +8,9 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.network.chat.Component;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -33,7 +33,7 @@ public class FuncCommandMod implements ModInitializer {
     }
 
     // --------------------------------------------------
-    // EXECUTION (NO OP REQUIRED)
+    // EXECUTION (NO OP REQUIRED, 1.21.11 SAFE)
     // --------------------------------------------------
     private static int execute(
         CommandContext<CommandSourceStack> ctx,
@@ -73,9 +73,9 @@ public class FuncCommandMod implements ModInitializer {
             command += " " + nbtPart;
         }
 
-        // 🔑 CRITICAL FIX:
-        // Run as the SAME player, but with elevated permissions
-        CommandSourceStack elevated = source.withPermission(4);
+        // 🔑 CORRECT FOR 1.21.11
+        // Preserve player context, elevate permission
+        CommandSourceStack elevated = source.withPermissionLevel(4);
 
         elevated.getServer()
             .getCommands()
