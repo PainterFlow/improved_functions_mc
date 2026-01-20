@@ -21,9 +21,10 @@ public class FuncCommandMod implements ModInitializer {
             dispatcher.register(
                 Commands.literal("dfunc")
                     .then(
-                        Commands.argument("function", StringArgumentType.word())
+                        // 🔑 IMPORTANT FIX: string(), NOT word()
+                        Commands.argument("function", StringArgumentType.string())
                             .suggests(FuncCommandMod::suggestFunctions)
-                            // /dfunc <function>
+                            // /dfunc <namespace:path>
                             .executes(ctx ->
                                 execute(
                                     ctx,
@@ -32,7 +33,7 @@ public class FuncCommandMod implements ModInitializer {
                                 )
                             )
                             .then(
-                                // /dfunc <function> <nbt>
+                                // /dfunc <namespace:path> <nbt>
                                 Commands.argument("nbt", StringArgumentType.greedyString())
                                     .executes(ctx ->
                                         execute(
