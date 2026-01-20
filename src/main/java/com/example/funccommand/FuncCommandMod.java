@@ -11,6 +11,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -39,7 +40,8 @@ public class FuncCommandMod implements ModInitializer {
         CommandContext<CommandSourceStack> ctx,
         String input
     ) {
-        CommandSourceStack source = ctx.getSource();
+        CommandSourceStack originalSource = ctx.getSource();
+        MinecraftServer server = originalSource.getServer();
 
         // Split "<function> [nbt...]"
         String functionPart;
@@ -57,7 +59,7 @@ public class FuncCommandMod implements ModInitializer {
         try {
             parsed = ResourceLocation.parse(functionPart);
         } catch (Exception e) {
-            source.sendFailure(Component.literal("Invalid function ID"));
+            originalSource.sendFailure(Component.literal("Invalid function ID"));
             return 0;
         }
 
@@ -73,13 +75,18 @@ public class FuncCommandMod implements ModInitializer {
             command += " " + nbtPart;
         }
 
-        // 🔑 CORRECT FOR 1.21.11
-        // Preserve player context, elevate permission
-        CommandSourceStack elevated = source.withPermissionLevel(4);
+        // --------------------------------------------------
+        // 🔑 CORRECT 1.21.11 EXECUTION MODEL
+        // --------------------------------------------------
 
-        elevated.getServer()
-            .getCommands()
-            .performPrefixedCommand(elevated, command);
+        CommandSourceStack serverSource = server.createCommandSourceStack();
+
+        // Preserve player context (@s, position, dimension, rotation)
+        if (originalSource.getEntity() instanceof ServerPlayer player) {
+            serverSource = serverSource.withEntity(player);
+        }
+
+        server.getCommands().performPrefixedCommand(serverSource, command);
 
         return 1;
     }
