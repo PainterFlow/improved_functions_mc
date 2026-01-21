@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ServerFunctionManager.class)
-public abstract class FunctionExecutionMixin {
+public abstract class FunctionCommandMixin {
 
     @Inject(
         method = "execute",
