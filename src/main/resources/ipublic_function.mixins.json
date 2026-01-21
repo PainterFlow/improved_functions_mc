@@ -1,10 +1,9 @@
 {
   "required": true,
-  "package": "com.example.funccommand.mixin",
+  "package": "com.example.ipublic_function.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "FunctionCommandMixin",
-    "ServerFunctionEntryAccessor"
+    "FunctionCommandMixin"
   ],
   "injectors": {
     "defaultRequire": 1
