@@ -1,18 +1,15 @@
 {
   "schemaVersion": 1,
-  "id": "funccommand",
+  "id": "ipublic_function",
   "version": "1.0.0",
-  "name": "Func Command",
-  "description": "Adds /func as a permission-level-0 alternative to /function.",
+  "name": "iPublic Function Access",
   "environment": "*",
-  "entrypoints": {
-    "main": [
-      "com.example.funccommand.FuncCommandMod"
-    ]
-  },
+  "entrypoints": {},
+  "mixins": [
+    "ipublic_function.mixins.json"
+  ],
   "depends": {
-    "fabricloader": ">=0.15.0",
-    "fabric-api": "*",
-    "minecraft": "1.21.x"
+    "fabricloader": ">=0.18.0",
+    "minecraft": "1.21.11"
   }
 }
