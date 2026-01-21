@@ -1,43 +1,53 @@
 package com.example.funccommand.mixin;
 
+import com.example.funccommand.mixin.ServerFunctionEntryAccessor; // 👈 REQUIRED
+
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.commands.FunctionCommand;
+import net.minecraft.server.ServerFunctionManager;
 import net.minecraft.server.level.ServerPlayer;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(FunctionCommand.class)
+import java.util.Collection;
+
+@Mixin(ServerFunctionManager.class)
 public abstract class FunctionCommandMixin {
 
     @Inject(
-        method = "queueFunctions",
+        method = "method_9206",
         at = @At("HEAD"),
         cancellable = true
     )
-    private static void ipublic_function$restrictNonOpFunctions(
+    private void ipublic_function$restrictNonOpFunctions(
+            Collection<?> entries,
+            CompoundTag _tag,
             CommandSourceStack source,
-            ResourceLocation functionId,
-            CallbackInfo ci
+            CallbackInfoReturnable<Integer> cir
     ) {
-        // OPs / vanilla behavior untouched
         if (source.hasPermission(2)) {
             return;
         }
 
-        // Only players may bypass
         ServerPlayer player = source.getPlayer();
         if (player == null) {
-            ci.cancel();
+            cir.setReturnValue(0);
             return;
         }
 
-        // Only allow ipublic/*
-        if (!functionId.getPath().startsWith("ipublic/")) {
-            ci.cancel();
+        for (Object entry : entries) {
+            ResourceLocation id =
+                ((ServerFunctionEntryAccessor) entry)
+                    .ipublic_function$getId();
+
+            if (!id.getPath().startsWith("ipublic/")) {
+                cir.setReturnValue(0);
+                return;
+            }
         }
     }
 }
